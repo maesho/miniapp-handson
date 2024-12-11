@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import liff from '@line/liff';
 
 const ShootingGame = () => {
   const canvasRef = useRef(null);
@@ -18,6 +19,74 @@ const ShootingGame = () => {
     width: 400,
     height: 600
   });
+
+  // シェア機能
+  const handleShare = () => {
+    if (liff.isApiAvailable('shareTargetPicker')) {
+      liff.shareTargetPicker([
+        {
+          type: 'flex',
+          altText: 'シューティングゲームのスコアをシェア！',
+          contents: {
+            type: 'bubble',
+            hero: {
+              type: 'image',
+              url: 'https://example.com/game-image.png', // ゲーム画像のURLに置き換えてください
+              size: 'full',
+              aspectRatio: '20:13',
+              aspectMode: 'cover'
+            },
+            body: {
+              type: 'box',
+              layout: 'vertical',
+              contents: [
+                {
+                  type: 'text',
+                  text: `シューティングゲームで${gameState.score}点をとったよ！`,
+                  size: 'lg',
+                  weight: 'bold',
+                  wrap: true
+                },
+                {
+                  type: 'text',
+                  text: '手軽に遊べるミニゲーム',
+                  size: 'sm',
+                  color: '#999999',
+                  margin: 'md'
+                }
+              ]
+            },
+            footer: {
+              type: 'box',
+              layout: 'vertical',
+              contents: [
+                {
+                  type: 'button',
+                  action: {
+                    type: 'uri',
+                    label: '遊んでみる！',
+                    uri: `https://liff.line.me/${liff.id}`
+                  },
+                  style: 'primary'
+                }
+              ]
+            }
+          }
+        }
+      ])
+      .then((res) => {
+        if (res) {
+          alert('シェアしました！');
+        } else {
+          alert('シェアをキャンセルしました。');
+        }
+      })
+      .catch((error) => {
+        alert('エラーが発生しました。');
+        console.error(error);
+      });
+    }
+  };
 
   // 効果音生成
   const createSound = (frequency, type = 'square') => {
@@ -87,7 +156,7 @@ const ShootingGame = () => {
       }
 
       // パワーアップアイテムの生成
-      if (timestamp - lastPowerupSpawn > 10000) { // 10秒ごと
+      if (timestamp - lastPowerupSpawn > 10000) {
         const powerupType = Object.keys(powerupTypes)[Math.floor(Math.random() * Object.keys(powerupTypes).length)];
         setGameState(prev => ({
           ...prev,
@@ -136,7 +205,7 @@ const ShootingGame = () => {
               if (newEnemies[j].hp <= 0) {
                 newScore += newEnemies[j].points;
                 newEnemies.splice(j, 1);
-                createSound(440); // 敵撃破音
+                createSound(440);
               }
               break;
             }
@@ -148,17 +217,18 @@ const ShootingGame = () => {
           if (checkCollision(prev.player, newPowerups[i])) {
             const powerup = newPowerups[i];
             newPowerups.splice(i, 1);
-            createSound(660); // パワーアップ取得音
+            createSound(660);
             
             switch (powerup.type) {
               case 'multishot':
                 newPlayer.powerLevel = Math.min(3, newPlayer.powerLevel + 1);
                 break;
               case 'speedup':
-                // スピードアップは弾の発射間隔で実装
                 break;
               case 'shield':
                 newPlayer.shield = true;
+                break;
+              default:
                 break;
             }
           }
@@ -169,10 +239,10 @@ const ShootingGame = () => {
           if (checkCollision(prev.player, enemy)) {
             if (newPlayer.shield) {
               newPlayer.shield = false;
-              createSound(220); // シールド破壊音
+              createSound(220);
             } else {
               isGameOver = true;
-              createSound(110); // ゲームオーバー音
+              createSound(110);
               if (newScore > prev.highScore) {
                 localStorage.setItem('shootingGameHighScore', newScore.toString());
               }
@@ -215,7 +285,6 @@ const ShootingGame = () => {
         ctx.fillStyle = enemy.color;
         ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
         
-        // HPバー（tank用）
         if (enemy.type === 'tank') {
           ctx.fillStyle = '#00ff00';
           const hpWidth = (enemy.hp / enemyTypes.tank.hp) * enemy.width;
@@ -278,9 +347,8 @@ const ShootingGame = () => {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     
-    createSound(880); // 射撃音
+    createSound(880);
 
-    // パワーレベルに応じた弾の生成
     setGameState(prev => {
       const newBullets = [];
       if (prev.player.powerLevel >= 1) newBullets.push({ x, y: prev.player.y - 20, width: 4, height: 4 });
@@ -319,14 +387,25 @@ const ShootingGame = () => {
         onClick={handleCanvasClick}
         className="border border-gray-400"
       />
-      <div className="text-sm space-y-1">
-        <div>Click to shoot and move player horizontally</div>
-        <div>Collect power-ups to enhance your ship:</div>
-        <div>🔵 Shield - Protects from one hit</div>
-        <div>🌟 Multi-shot - Increases number of bullets</div>
-        <div>💨 Speed-up - Temporary speed boost</div>
-        {gameState.gameOver && <div className="font-bold">Click anywhere to restart</div>}
-      </div>
+      {!gameState.gameOver ? (
+        <div className="text-sm space-y-1">
+          <div>Click to shoot and move player horizontally</div>
+          <div>Collect power-ups to enhance your ship:</div>
+          <div>🔵 Shield - Protects from one hit</div>
+          <div>🌟 Multi-shot - Increases number of bullets</div>
+          <div>💨 Speed-up - Temporary speed boost</div>
+        </div>
+      ) : (
+        <div className="text-center">
+          <div className="text-sm font-bold">Click anywhere to restart</div>
+          <button 
+            onClick={handleShare}
+            className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            シェア！
+          </button>
+        </div>
+      )}
     </div>
   );
 };
